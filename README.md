@@ -73,6 +73,35 @@ npm run dev
 | 数据集关联 | `dataset_join` | 关联方案 | 方案编号、主数据集、关联数据集 |
 | 报告生成 | `report_builder` | 报告模板 | 模板编号、报告名称、引用指标 |
 
+## 分析快照字段清单迁移（snapshot_migration）
+
+把"只有字段摘要和查询编号"的旧导出迁移为带**投影顺序、列类型、实际行数、
+文件校验值**的分析快照字段清单，代码在 `backend/app/snapshot_migration/`：
+
+- 迁移分 `build → verify → enable-reader` 三段，journal 断点可接续；
+  清单原子写盘，进程在核验落盘后、写日志前被杀也能从断点重启续跑；
+  启用新版读入是独立的升级确认，与清单构建、文件核验分开验证。
+- 历史日报始终按旧证据文件回算；新版取数只引用核验过的文件
+  （待核 `pending_verification`、缺文件 `missing_file` 都明确拒绝）；
+  新版日报钉住当次采用的一个投影和一个真实文件来源，取数后可按该投影回算。
+- 缺文件的同名快照停留在可说明状态，摘要里"声称的行数"仅作未证实声明，
+  不借用其他快照的文件伪造数据行。
+
+```bash
+cd backend
+# 端到端演练（真实子进程中断/重启 + 中断点并发回算与取数）
+.venv/bin/python -m app.snapshot_migration.cli --state var/demo story
+# 单步命令：seed-demo / migrate build|verify|enable-reader|resume|status /
+#           report recompute-legacy|fetch-new|daily-new|recompute-new / audit
+.venv/bin/python -m pytest tests/test_snapshot_migration.py   # 15 个场景测试
+```
+
+HTTP 接口挂在 `/api/snapshot-migration/`（status、build、verify、resume、
+enable-reader、audit、fetch、daily-report、recompute 等）；状态目录默认
+`backend/var/snapshot_migration`（可用 `SNAPSHOT_MIGRATION_STATE` 覆盖），
+为空时自动写入演示数据：同名查询 Q-1001 的两份快照（一份有旧文件 8/12 元，
+一份只有摘要）加一份历史日报。
+
 ## 约定
 
 - 全部模块共享`frontend/src/views/WorkbenchView.vue|tsx`和一套资源路由。

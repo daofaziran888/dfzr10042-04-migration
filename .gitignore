@@ -53,6 +53,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# ===== 运行时状态 =====
+backend/var/
+
 # ===== 环境变量与本地配置 =====
 .env
 .env.local
